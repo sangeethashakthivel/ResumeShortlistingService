@@ -32,13 +32,16 @@ public class ResumeService {
     Tika tika;
 
     /**
-     * Upload a resume file, parse candidate name and calculate ATS score
+     * Upload a resume file, parse candidate name, calculate ATS + Experience scores
      */
     public Resume uploadResume(MultipartFile file, String jobDescription, String jobTitle, String candidateName) throws IOException, TikaException {
         String content = tika.parseToString(file.getInputStream());
 
+        double atsScore = calculateATSScore(content, jobDescription);
+        double experienceScore = calculateExperienceScore(content);
 
-        double score = calculateATSScore(content, jobDescription);
+        // Combine scores (you can adjust weighting if needed)
+        double totalScore = atsScore + experienceScore;
 
         JobRole jobRole = jobRoleRepository.findByTitleIgnoreCase(jobTitle);
         double threshold = (jobRole != null) ? jobRole.getThresholdScore() : 50; // fallback
@@ -46,10 +49,12 @@ public class ResumeService {
         Resume resume = Resume.builder()
                 .candidateName(candidateName)
                 .content(content)
-                .score(score)
+                .score(totalScore)
                 .jobTitle(jobTitle)
-                .status(score >= threshold ? "Selected" : "Rejected")
+                .status(totalScore >= threshold ? "Selected" : "Rejected")
                 .uploadedAt(LocalDateTime.now())
+                .atsScore(atsScore)
+                .experienceScore(experienceScore)
                 .build();
 
         return resumeRepository.save(resume);
@@ -59,20 +64,13 @@ public class ResumeService {
      * Extract candidate name from resume content
      */
     private String extractCandidateName(String content, String fileName) {
-        // Try "Name: John Doe"
         Pattern pattern = Pattern.compile("(?i)name[:\\s]+([A-Za-z ]+)");
         Matcher matcher = pattern.matcher(content);
-        if (matcher.find()) {
-            return matcher.group(1).trim();
-        }
+        if (matcher.find()) return matcher.group(1).trim();
 
-        // Try first line
         String firstLine = content.split("\\R", 2)[0];
-        if (firstLine.split(" ").length <= 5) { // usually short like "John Doe"
-            return firstLine.trim();
-        }
+        if (firstLine.split(" ").length <= 5) return firstLine.trim();
 
-        // Fallback to filename (without extension)
         if (fileName != null && fileName.contains(".")) {
             return fileName.substring(0, fileName.lastIndexOf('.'));
         }
@@ -80,12 +78,18 @@ public class ResumeService {
     }
 
     /**
-     * Get candidate score
+     * Get candidate score details
      */
     public String calculateScore(String candidateName) {
         Optional<Resume> resume = resumeRepository.findByCandidateNameIgnoreCase(candidateName);
-        return resume.map(value -> String.format("✅ Candidate: %s%nATS Score: %.2f%nStatus: %s",
-                value.getCandidateName(), value.getScore(), value.getStatus())).orElseGet(() -> "❌ No resume found for candidate: " + candidateName);
+        return resume.map(value -> String.format(
+                " Candidate: %s%nATS Score: %.2f%nExperience Score: %.2f%nTotal Score: %.2f%nStatus: %s",
+                value.getCandidateName(),
+                value.getAtsScore(),
+                value.getExperienceScore(),
+                value.getScore(),
+                value.getStatus()
+        )).orElse(" No resume found for candidate: " + candidateName);
     }
 
     /**
@@ -113,5 +117,24 @@ public class ResumeService {
         }
 
         return score;
+    }
+
+    /**
+     * Experience scoring logic
+     * Simple logic: 1 point per year of experience found in resume
+     */
+    private double calculateExperienceScore(String resumeContent) {
+        Pattern pattern = Pattern.compile("(\\d+)\\s*(?:years|yrs)\\s*experience", Pattern.CASE_INSENSITIVE);
+        Matcher matcher = pattern.matcher(resumeContent);
+
+        double maxExp = 0;
+        while (matcher.find()) {
+            try {
+                double exp = Double.parseDouble(matcher.group(1));
+                if (exp > maxExp) maxExp = exp;
+            } catch (NumberFormatException ignored) {}
+        }
+
+        return maxExp * 2;
     }
 }

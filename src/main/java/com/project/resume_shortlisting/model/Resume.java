@@ -28,6 +28,12 @@ public class Resume {
     @Column(name = "Score")
     private double score;
 
+    @Column(name = "AtsScore")
+    private double atsScore;
+
+    @Column(name = "ExperienceScore")
+    private double experienceScore;
+
     @Column(name = "Status")
     private String status;
 

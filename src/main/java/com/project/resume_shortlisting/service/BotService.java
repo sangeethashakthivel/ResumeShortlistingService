@@ -31,14 +31,14 @@ public class BotService {
         if (matches(lower, new String[]{"hi", "hello", "hey", "yo", "whats up"}))
             return BotQuestionType.GREETING;
 
-        if (matches(lower, new String[]{"weightage", "importance", "how important", "tell me about"}))
+        if (matches(lower, new String[]{"weightage","score for", "importance", "how important", "tell me about"}))
             return BotQuestionType.SKILL_WEIGHTAGE;
 
         if (matches(lower, new String[]{"top", "best", "show me", "list"})
                 && matches(lower, new String[]{"candidate", "people", "guys"}))
             return BotQuestionType.TOP_CANDIDATES;
 
-        if (matches(lower, new String[]{"threshold", "passing", "minimum", "score needed"}))
+        if (matches(lower, new String[]{"threshold", "passing", "minimum","minimum score", "score needed"}))
             return BotQuestionType.JOB_THRESHOLD;
 
         if (matches(lower, new String[]{"is", "did"})

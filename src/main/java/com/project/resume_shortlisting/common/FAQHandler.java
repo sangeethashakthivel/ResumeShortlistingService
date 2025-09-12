@@ -19,12 +19,21 @@ public class FAQHandler implements BotResponseHandler {
 
     @Override
     public String handle(String userInput) {
-        // Extract possible keyword (last word in sentence, for simplicity)
-        String[] words = userInput.trim().split("\\s+");
-        String keyword = words[words.length - 1];
+        String input = userInput.trim().toLowerCase();
 
-        return faqRepo.findByKeywordIgnoreCase(keyword)
-                .map(botFAQ -> botFAQ.getAnswer())
-                .orElse("I’m not sure about that 🤔. Please check with an admin.");
+        // 1. Try exact match with full input
+        var faq = faqRepo.findByKeywordIgnoreCase(input);
+        if (faq.isPresent()) return faq.get().getAnswer();
+
+        // 2. Fallback: try last word
+        String[] words = input.split("\\s+");
+        if (words.length > 0) {
+            faq = faqRepo.findByKeywordIgnoreCase(words[words.length - 1]);
+            if (faq.isPresent()) return faq.get().getAnswer();
+        }
+
+        return "I’m not sure about that 🤔. Please check with an admin.";
     }
+
+
 }
