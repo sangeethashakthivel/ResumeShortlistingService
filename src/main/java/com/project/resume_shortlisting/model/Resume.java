@@ -26,13 +26,13 @@ public class Resume {
     private String content;
 
     @Column(name = "Score")
-    private double score;
+    private Double  score;
 
     @Column(name = "AtsScore")
-    private double atsScore;
+    private Double  atsScore;
 
     @Column(name = "ExperienceScore")
-    private double experienceScore;
+    private Double  experienceScore;
 
     @Column(name = "Status")
     private String status;

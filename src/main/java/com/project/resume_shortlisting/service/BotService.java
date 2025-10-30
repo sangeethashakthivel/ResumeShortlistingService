@@ -6,7 +6,7 @@ import com.project.resume_shortlisting.utility.FuzzyMatcher;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
-import java.util.List;
+import java.util.*;
 
 @Service
 @RequiredArgsConstructor
@@ -14,6 +14,41 @@ public class BotService {
 
     private final List<BotResponseHandler> handlers;
 
+    // Keywords per BotQuestionType
+    private static final Map<BotQuestionType, List<String[]>> KEYWORDS = new LinkedHashMap<>();
+
+    static {
+        // GREETING
+        List<String[]> greetingList = new LinkedList<>();
+        greetingList.add(new String[]{"hi", "hello", "hey", "yo", "whats up", "good morning", "morning", "good night"});
+        KEYWORDS.put(BotQuestionType.GREETING, greetingList);
+
+        // SKILL_WEIGHTAGE
+        List<String[]> skillList = new LinkedList<>();
+        skillList.add(new String[]{"weightage", "score for", "importance", "how important", "tell me about"});
+        KEYWORDS.put(BotQuestionType.SKILL_WEIGHTAGE, skillList);
+
+        // TOP_CANDIDATES
+        List<String[]> topCandidatesList = new LinkedList<>();
+        topCandidatesList.add(new String[]{"top", "best", "show me", "list"});
+        topCandidatesList.add(new String[]{"candidate", "people", "guys"});
+        KEYWORDS.put(BotQuestionType.TOP_CANDIDATES, topCandidatesList);
+
+        // JOB_THRESHOLD
+        List<String[]> jobThresholdList = new LinkedList<>();
+        jobThresholdList.add(new String[]{"threshold", "passing", "minimum", "minimum score", "score needed"});
+        KEYWORDS.put(BotQuestionType.JOB_THRESHOLD, jobThresholdList);
+
+        // CANDIDATE_STATUS
+        List<String[]> candidateStatusList = new LinkedList<>();
+        candidateStatusList.add(new String[]{"is", "did"});
+        candidateStatusList.add(new String[]{"selected", "rejected", "clear"});
+        KEYWORDS.put(BotQuestionType.CANDIDATE_STATUS, candidateStatusList);
+    }
+
+    /**
+     * Get bot response based on user input
+     */
     public String getResponse(String userInput) {
         BotQuestionType type = classify(userInput);
 
@@ -24,35 +59,46 @@ public class BotService {
                 .orElse("Sorry, I didn’t understand that. 🤔 Can you rephrase?");
     }
 
-    // --- Natural language + fuzzy matching ---
+    /**
+     * Classify user input into BotQuestionType
+     */
     private BotQuestionType classify(String input) {
-        String lower = input.toLowerCase();
+        String lower = input.toLowerCase().replace("?", "").trim();
 
-        if (matches(lower, new String[]{"hi", "hello", "hey", "yo", "whats up"}))
-            return BotQuestionType.GREETING;
+        for (Map.Entry<BotQuestionType, List<String[]>> entry : KEYWORDS.entrySet()) {
+            List<String[]> groups = entry.getValue();
 
-        if (matches(lower, new String[]{"weightage","score for", "importance", "how important", "tell me about"}))
-            return BotQuestionType.SKILL_WEIGHTAGE;
+            boolean matched;
 
-        if (matches(lower, new String[]{"top", "best", "show me", "list"})
-                && matches(lower, new String[]{"candidate", "people", "guys"}))
-            return BotQuestionType.TOP_CANDIDATES;
+            if (entry.getKey() == BotQuestionType.CANDIDATE_STATUS) {
+                // For candidate status, just check if any status keyword is present
+                matched = matches(lower, groups.get(1)); // second group: selected/rejected/clear
+            } else if (groups.size() == 1) {
+                matched = matches(lower, groups.get(0));
+            } else {
+                // multiple groups, all groups must match at least one keyword
+                matched = true;
+                for (String[] group : groups) {
+                    if (!matches(lower, group)) {
+                        matched = false;
+                        break;
+                    }
+                }
+            }
 
-        if (matches(lower, new String[]{"threshold", "passing", "minimum","minimum score", "score needed"}))
-            return BotQuestionType.JOB_THRESHOLD;
-
-        if (matches(lower, new String[]{"is", "did"})
-                && matches(lower, new String[]{"selected", "rejected", "clear"}))
-            return BotQuestionType.CANDIDATE_STATUS;
+            if (matched) return entry.getKey();
+        }
 
         return BotQuestionType.UNKNOWN;
-
     }
 
+    /**
+     * Check if input contains any of the keywords (with fuzzy match)
+     */
     private boolean matches(String input, String[] keywords) {
         for (String keyword : keywords) {
             if (input.contains(keyword)) return true;
-            if (FuzzyMatcher.isSimilar(input, keyword, 2)) return true; // allow small typos
+            if (FuzzyMatcher.isSimilar(input, keyword, 2)) return true;
         }
         return false;
     }
